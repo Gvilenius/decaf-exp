@@ -78,6 +78,7 @@ public abstract class Tree {
         public boolean hasParent() {
             return parent.isPresent();
         }
+
         public boolean isAbstract() {return modifiers.isAbstract();}
 
         public List<MethodDef> methods() {
