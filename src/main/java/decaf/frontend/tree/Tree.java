@@ -75,6 +75,15 @@ public abstract class Tree {
             this.name = id.name;
         }
 
+        public ClassDef(Id id, Optional<Id> parent, List<Field> fields, Pos pos) {
+            super(Kind.CLASS_DEF, "ClassDef", pos);
+            this.modifiers = new Modifiers();
+            this.id = id;
+            this.parent = parent;
+            this.fields = fields;
+            this.name = id.name;
+        }
+
         public boolean hasParent() {
             return parent.isPresent();
         }
