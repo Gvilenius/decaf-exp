@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CompilerConfiguration">
-    <bytecodeTargetLevel>
-      <module name="decaf.main" target="12" />
-      <module name="decaf.test" target="12" />
-    </bytecodeTargetLevel>
+    <bytecodeTargetLevel target="12" />
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_STRING" value="--enable-preview" />
   </component>
 </project>

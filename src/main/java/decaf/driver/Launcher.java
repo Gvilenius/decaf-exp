@@ -24,7 +24,12 @@ public class Launcher {
         var tasks = new TaskFactory(config);
         var task = switch (config.target) {
             case PA1 -> tasks.parse();
-            default -> throw new IllegalArgumentException("target not implemented");
+            case PA1_LL -> tasks.parseLL();
+//            case PA2 -> tasks.typeCheck();
+//            case PA3 -> tasks.tacGen();
+//            case PA4 -> tasks.optimize();
+//            case PA5 -> tasks.mips();
+            default -> tasks.parseLL();
         };
         task.apply(config.source);
     }

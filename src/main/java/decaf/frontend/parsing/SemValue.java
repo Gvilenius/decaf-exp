@@ -121,9 +121,6 @@ class SemValue {
                 case Tokens.VOID -> "keyword  : void";
                 case Tokens.WHILE -> "keyword  : while";
                 case Tokens.STATIC -> "keyword : static";
-                case Tokens.ABSTRACT -> "keyword : abstract";
-                case Tokens.VAR -> "keyword : var";
-                case Tokens.FUN -> "keyword : fun";
                 case Tokens.INT_LIT -> "int literal : " + intVal;
                 case Tokens.BOOL_LIT -> "bool literal : " + boolVal;
                 case Tokens.STRING_LIT -> "string literal : " + StringUtils.quote(strVal);
@@ -134,7 +131,11 @@ class SemValue {
                 case Tokens.LESS_EQUAL -> "operator : <=";
                 case Tokens.NOT_EQUAL -> "operator : !=";
                 case Tokens.OR -> "operator : ||";
+
                 case Tokens.TO -> "operator : =>";
+                case Tokens.VAR -> "keyword : var";
+                case Tokens.FUN -> "keyword : fun";
+                case Tokens.ABSTRACT -> "keyword : abstract";
                 default -> "operator : " + (char) code;
             };
             case CLASS -> "CLASS: " + clazz;
