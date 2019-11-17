@@ -19,7 +19,6 @@ package decaf.frontend.type;
  * @see FunType
  */
 public abstract class Type {
-
     /**
      * Is this type int, bool, or string?
      *
@@ -45,6 +44,9 @@ public abstract class Type {
         return false;
     }
 
+    public boolean isLambdaType() {
+        return false;
+    }
     public boolean noError() {
         return true;
     }

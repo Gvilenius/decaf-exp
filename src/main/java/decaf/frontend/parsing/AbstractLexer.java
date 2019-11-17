@@ -19,7 +19,7 @@ abstract class AbstractLexer<P extends AbstractParser> {
 
     /**
      * Get position of the current token.
-     *
+     */
     abstract Pos getPos();
 
     /**
@@ -131,6 +131,4 @@ abstract class AbstractLexer<P extends AbstractParser> {
     protected void issueError(DecafError error) {
         issuer.issue(error);
     }
-
-    public abstract Pos getPos();
 }

@@ -28,11 +28,11 @@ import java.util.Optional;
 %left TO
 %left OR
 %left AND
-%nonassoc EQUAL NOT_EQUAL
+%left EQUAL NOT_EQUAL
 %nonassoc LESS_EQUAL GREATER_EQUAL '<' '>'
 %left  '+' '-'
 %left  '*' '/' '%'
-%nonassoc UMINUS '!'
+%nonassoc CAST UMINUS '!'
 %nonassoc '[' '.'
 %nonassoc ')' EMPTY
 %nonassoc ELSE

@@ -52,7 +52,7 @@ public abstract class Phase<In, Out> implements Task<In, Out>, ErrorIssuer {
      * @return output (if succeeds)
      */
     @Override
-    public Optional<Out> apply(In in){
+    public Optional<Out> apply(In in) {
         var out = transform(in);
         if (hasError()) {
             printErrors(System.err);

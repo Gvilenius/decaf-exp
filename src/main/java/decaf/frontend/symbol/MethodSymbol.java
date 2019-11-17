@@ -68,6 +68,8 @@ public final class MethodSymbol extends Symbol {
     public boolean isStatic() {
         return modifiers.isStatic();
     }
-
+    public boolean isAbstract( ) {
+        return modifiers.isAbstract();
+    }
     private boolean main = false;
 }

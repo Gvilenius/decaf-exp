@@ -19,6 +19,10 @@ public class FormalScope extends Scope {
         this.owner = owner;
     }
 
+    public boolean have(String key){
+//        if (symbols.)
+        return false;
+    }
     @Override
     public boolean isFormalScope() {
         return true;

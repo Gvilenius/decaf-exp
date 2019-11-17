@@ -2,17 +2,12 @@ package decaf.frontend.tree;
 
 import decaf.frontend.scope.GlobalScope;
 import decaf.frontend.scope.LocalScope;
-import decaf.frontend.symbol.ClassSymbol;
-import decaf.frontend.symbol.MethodSymbol;
-import decaf.frontend.symbol.VarSymbol;
+import decaf.frontend.symbol.*;
 import decaf.frontend.type.FunType;
 import decaf.frontend.type.Type;
 import decaf.lowlevel.instr.Temp;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * All kinds of tree node in the abstract syntax tree.
@@ -77,7 +72,41 @@ public abstract class Tree {
         public final List<Field> fields;
         // For convenience
         public final String name;
+        // For type check
+        public ClassDef superClass;
+        public ClassSymbol symbol;
+        public boolean resolved = false;
+        public ArrayList<String> methodNames;
+        public ArrayList<MethodDef> methodDefs;
 
+        public void initMethodArray(){
+            methodNames = new ArrayList<>();
+            methodDefs = new ArrayList<>();
+        }
+        public void addMethod(MethodDef methodDef){
+            var argTypes = new ArrayList<Type>();
+            for (var param : methodDef.params) {
+                argTypes.add(param.typeLit.get().type);
+            }
+            methodDef.type = new FunType(methodDef.returnType.type, argTypes);
+
+            methodDefs.add(methodDef);
+            methodNames.add(methodDef.name);
+        }
+        public void removeMethod(MethodDef methodDef){
+            if (!methodDef.isStatic() && methodNames.contains(methodDef.name)){
+                int index = methodNames.indexOf(methodDef.name);
+                MethodDef method = methodDefs.get(index);
+                System.out.println(method);
+                if (methodDef.type.subtypeOf(method.type)){
+                    methodNames.remove(index);
+                    methodDefs.remove(index);
+                }
+            }
+        }
+        public boolean isConcrete(){
+            return methodNames.isEmpty();
+        }
         public ClassDef(boolean isAbstract, Id id, Optional<Id> parent, List<Field> fields, Pos pos) {
             super(Kind.CLASS_DEF, "ClassDef", pos);
             this.modifiers = isAbstract ? new Modifiers(Modifiers.ABSTRACT, pos) : new Modifiers();
@@ -85,6 +114,7 @@ public abstract class Tree {
             this.parent = parent;
             this.fields = fields;
             this.name = id.name;
+            initMethodArray();
         }
 
         public ClassDef(Id id, Optional<Id> parent, List<Field> fields, Pos pos) {
@@ -94,6 +124,7 @@ public abstract class Tree {
             this.parent = parent;
             this.fields = fields;
             this.name = id.name;
+            initMethodArray();
         }
 
         public boolean hasParent() {
@@ -205,6 +236,10 @@ public abstract class Tree {
         public Optional<Block> body;
         // For convenience
         public String name;
+        // For type check
+        public FunType type;
+        public MethodSymbol symbol;
+
         public MethodDef(boolean isStatic, Id id, TypeLit returnType, List<LocalVarDef> params, Block body, Pos pos) {
             super(Kind.METHOD_DEF, "MethodDef", pos);
             int code = 0;
@@ -482,6 +517,7 @@ public abstract class Tree {
         /**
          * For type check: does this return a value?
          */
+        public ArrayList<Type> returnTypes = new ArrayList<>();
         public boolean returns = false;
 
         public boolean isBlock() {
@@ -561,6 +597,8 @@ public abstract class Tree {
         public List<Stmt> stmts;
         // For type check
         public LocalScope scope;
+
+        public Type type;
 
         public Block(List<Stmt> stmts, Pos pos) {
             super(Kind.BLOCK, "Block", pos);
@@ -953,6 +991,7 @@ public abstract class Tree {
         public Expr expr;
         public Block block;
 
+        public LambdaSymbol symbol;
         public Lambda(List<LocalVarDef> varList, Expr expr, Pos pos){
             super(Kind.LAMBDA, "Lambda", pos);
             this.varList = varList;
@@ -1574,13 +1613,14 @@ public abstract class Tree {
      */
     public static class Call extends Expr {
         // Tree elements
+        public Expr expr;
         public Optional<Expr> receiver;
         public Id method;
         public List<Expr> args;
         //
         public String methodName;
         // For type check
-        public MethodSymbol symbol;
+        public Symbol symbol;
         public boolean isArrayLength = false;
 
         public Call(Optional<Expr> receiver, Id method, List<Expr> args, Pos pos) {
@@ -1590,9 +1630,17 @@ public abstract class Tree {
             this.args = args;
             this.methodName = method.name;
         }
-        public Call(Expr receiver, List<Expr> args, Pos pos){
+        public Call(Expr expr, List<Expr> args, Pos pos){
             super(Kind.CALL, "Call", pos);
-            this.receiver = Optional.ofNullable(receiver);
+            this.expr = expr;
+            if (expr instanceof VarSel){
+                this.receiver = ((VarSel)expr).receiver;
+                this.method = ((VarSel)expr).variable;
+                this.methodName = ((VarSel)expr).variable.name;
+            }
+            else{
+                this.receiver = Optional.empty();
+            }
             this.args = args;
         }
         public Call(Id method, List<Expr> args, Pos pos) {
@@ -1623,7 +1671,7 @@ public abstract class Tree {
                 };
             else
                 return switch (index) {
-                    case 0 -> receiver;
+                    case 0 -> expr;
                     case 1 -> args;
                     default -> throw new IndexOutOfBoundsException(index);
                 };

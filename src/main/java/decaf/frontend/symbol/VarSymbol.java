@@ -2,6 +2,7 @@ package decaf.frontend.symbol;
 
 import decaf.frontend.scope.ClassScope;
 import decaf.frontend.tree.Pos;
+import decaf.frontend.tree.Tree;
 import decaf.frontend.type.ClassType;
 import decaf.frontend.type.Type;
 import decaf.lowlevel.instr.Temp;
@@ -42,7 +43,7 @@ public final class VarSymbol extends Symbol {
     }
 
     public boolean isParam() {
-        return definedIn.isFormalScope();
+        return definedIn.isLambdaScope() || definedIn.isFormalScope();
     }
 
     public boolean isMemberVar() {
@@ -66,4 +67,5 @@ public final class VarSymbol extends Symbol {
      * Temp, reserved for {@link decaf.frontend.tacgen.TacGen}.
      */
     public Temp temp;
+    public LambdaSymbol lambdaSymbol;
 }

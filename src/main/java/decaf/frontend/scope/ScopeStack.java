@@ -1,10 +1,13 @@
 package decaf.frontend.scope;
 
 import decaf.frontend.symbol.ClassSymbol;
+import decaf.frontend.symbol.LambdaSymbol;
 import decaf.frontend.symbol.MethodSymbol;
 import decaf.frontend.symbol.Symbol;
 import decaf.frontend.tree.Pos;
+import decaf.frontend.tree.Tree;
 
+import java.awt.*;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.Optional;
@@ -70,6 +73,9 @@ public class ScopeStack {
         return currMethod;
     }
 
+    public LambdaSymbol currentLambda() {
+        return currLambda;
+    }
     /**
      * Open a scope.
      * <p>
@@ -90,6 +96,12 @@ public class ScopeStack {
             var formalScope = (FormalScope) scope;
             currMethod = formalScope.getOwner();
         }
+        else if (scope.isLambdaScope()) {
+            var lambdaScope = (LambdaScope) scope;
+            currLambda = lambdaScope.getOwner();
+            lambdaStack.push(lambdaScope);
+        }
+
         scopeStack.push(scope);
     }
 
@@ -107,6 +119,15 @@ public class ScopeStack {
             while (!scopeStack.isEmpty()) {
                 scopeStack.pop();
             }
+            assert lambdaStack.empty();
+        }
+        else if (scope.isLambdaScope()){
+            lambdaStack.pop();
+            if (!lambdaStack.isEmpty()){
+                currLambda = lambdaStack.peek().getOwner();
+            }
+            else
+                currLambda = null;
         }
     }
 
@@ -146,8 +167,8 @@ public class ScopeStack {
      * @return innermost conflicting symbol (if any)
      */
     public Optional<Symbol> findConflict(String key) {
-        if (currentScope().isFormalOrLocalScope())
-            return findWhile(key, Scope::isFormalOrLocalScope, whatever -> true).or(() -> global.find(key));
+        if (currentScope().isFormalOrLocalOrLambdaScope())
+            return findWhile(key, Scope::isFormalOrLocalOrLambdaScope, whatever -> true).or(() -> global.find(key));
         return lookup(key);
     }
 
@@ -192,17 +213,29 @@ public class ScopeStack {
     }
 
     private Stack<Scope> scopeStack = new Stack<>();
+    private Stack<LambdaScope> lambdaStack = new Stack<>();
     private ClassSymbol currClass;
     private MethodSymbol currMethod;
+    private LambdaSymbol currLambda;
 
     private Optional<Symbol> findWhile(String key, Predicate<Scope> cond, Predicate<Symbol> validator) {
         ListIterator<Scope> iter = scopeStack.listIterator(scopeStack.size());
         while (iter.hasPrevious()) {
             var scope = iter.previous();
-            if (!cond.test(scope)) return Optional.empty();
+//            System.out.println(scope);
+//            scope.symbols.keySet().forEach(e ->System.out.println(e));
+            if (!cond.test(scope)) {
+//                System.out.println();
+                return Optional.empty();
+            }
             var symbol = scope.find(key);
-            if (symbol.isPresent() && validator.test(symbol.get())) return symbol;
+            if (symbol.isPresent() && validator.test(symbol.get()))
+            {
+//                System.out.println();
+                return symbol;
+            }
         }
+//        System.out.println();
         return cond.test(global) ? global.find(key) : Optional.empty();
     }
 }

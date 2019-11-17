@@ -31,6 +31,28 @@ public final class FunType extends Type {
 
         // Recall: (t1, t2, ..., tn) => t <: (s1, s2, ..., sn) => s if t <: s and si <: ti for every i
         FunType that = (FunType) type;
+        if (this.returnType == null || that.returnType == null) return false;
+        if (!this.returnType.subtypeOf(that.returnType) || this.arity() != that.arity()) return false;
+        var thisArg = this.argTypes.iterator();
+        var thatArg = that.argTypes.iterator();
+        while (thisArg.hasNext()) {
+            if (!thatArg.next().subtypeOf(thisArg.next())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean overrideTypeOf(Type type) {
+        if (type.eq(BuiltInType.ERROR)) {
+            return true;
+        }
+        if (!type.isFuncType()) {
+            return false;
+        }
+
+        // Recall: (t1, t2, ..., tn) => t <: (s1, s2, ..., sn) => s if t <: s and si <: ti for every i
+        FunType that = (FunType) type;
         if (!this.returnType.subtypeOf(that.returnType) || this.arity() != that.arity()) return false;
         var thisArg = this.argTypes.iterator();
         var thatArg = that.argTypes.iterator();
@@ -63,7 +85,11 @@ public final class FunType extends Type {
         if (argTypes.isEmpty()) {
             sb.append("()");
         } else if (argTypes.size() == 1) {
-            sb.append(argTypes.get(0));
+            var arg = argTypes.get(0).toString();
+            if (argTypes.get(0).isFuncType()) {
+                arg = "(" + arg + ")";
+            }
+            sb.append(arg);
         } else {
             sb.append('(');
             for (int i = 0; i < argTypes.size(); i++) {

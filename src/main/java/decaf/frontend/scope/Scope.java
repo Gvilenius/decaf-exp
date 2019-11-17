@@ -19,6 +19,7 @@ import java.util.*;
  * @see ClassScope
  * @see FormalScope
  * @see LocalScope
+ * @see LambdaScope
  */
 public abstract class Scope implements Iterable<Symbol> {
 
@@ -99,9 +100,16 @@ public abstract class Scope implements Iterable<Symbol> {
         return false;
     }
 
+    public boolean isLambdaScope() {
+        return false;
+    }
+
     public boolean isFormalOrLocalScope() {
         return isFormalScope() || isLocalScope();
     }
 
+    public boolean isFormalOrLocalOrLambdaScope() {
+        return isFormalScope() || isLocalScope() || isLambdaScope();
+    }
     protected Map<String, Symbol> symbols = new TreeMap<>();
 }
