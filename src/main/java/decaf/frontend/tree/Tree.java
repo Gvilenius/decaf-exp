@@ -97,7 +97,6 @@ public abstract class Tree {
             if (!methodDef.isStatic() && methodNames.contains(methodDef.name)){
                 int index = methodNames.indexOf(methodDef.name);
                 MethodDef method = methodDefs.get(index);
-                System.out.println(method);
                 if (methodDef.type.subtypeOf(method.type)){
                     methodNames.remove(index);
                     methodDefs.remove(index);

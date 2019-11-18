@@ -363,7 +363,6 @@ public class Namer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
 
     @Override
     public void visitLambda(Tree.Lambda lambda, ScopeStack ctx) {
-
         var scope = new LambdaScope((LocalScope)ctx.currentScope());
         var symbol = new LambdaSymbol(null, scope, lambda.pos);
         ctx.declare(symbol);

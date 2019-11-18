@@ -180,7 +180,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                 return p;
             }
         }
-
         return null;
     }
 
@@ -218,13 +217,10 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                     && ctx.currentScope() instanceof LocalScope
                     && ctx.currentLambda() != null //在lambda作用
                     && !((LocalScope)ctx.currentScope()).have(((Tree.VarSel)stmt.lhs).name) //不在当前lambda作用域
-//                    && ctx.currentClass().scope.get(((Tree.VarSel)stmt.lhs).name) == null   //非类作用域
                     &&((Tree.VarSel)stmt.lhs).receiver.isEmpty()){ //非成员变量的引用
-
                     issue(new LambdaAssignVarOutOfScopeError(stmt.pos));
             }
         }
-
     }
 
     @Override
@@ -469,14 +465,11 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
     @Override
     public void visitVarSel(Tree.VarSel expr, ScopeStack ctx) {
         if (expr.receiver.isEmpty()) {
-            // Variable, which should be complicated since a legal variable could refer to a local var,
-            // a visible member var, and a class name.
             if (stk.contains(expr.name)) {
                 issue(new UndeclVarError(expr.pos, expr.name));
                 expr.type = BuiltInType.ERROR;
                 return;
             }
-
             var symbol = ctx.lookupBefore(expr.name, localVarDefPos.orElse(expr.pos));
             if (symbol.isPresent()) {
                 if (symbol.get().isVarSymbol()) {
@@ -514,6 +507,7 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
 
         // has receiver
         var receiver = expr.receiver.get();
+
         allowClassNameVar = true;
         receiver.accept(this, ctx);
         allowClassNameVar = false;
@@ -555,7 +549,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         var field = ctx.getClass(ct.name).scope.lookup(expr.name);
         if (field.isPresent() && field.get().isVarSymbol()) {
             var var = (VarSymbol) field.get();
-
             if (var.isMemberVar()) {
                 expr.symbol = var;
                 expr.type = var.type;
@@ -602,13 +595,7 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
     @Override
     public void visitCall(Tree.Call expr, ScopeStack ctx) {
         expr.type = BuiltInType.ERROR;
-        Type rt;
-        boolean thisClass = false;
-
-        allowClassNameVar = true;
         expr.expr.accept(this, ctx);
-        allowClassNameVar = false;
-
         if (expr.expr.type==null || expr.expr.type.hasError()) return;
 
         if (! (expr.expr.type instanceof FunType)) {
@@ -616,101 +603,12 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
             return;
         }
 
-        if (expr.expr instanceof Tree.VarSel) {
-            //static method + local var + member-method
-            //static member method, have receiver
-            if (((Tree.VarSel)expr.expr).receiver.isPresent()){
-                var receiver = ((Tree.VarSel)expr.expr).receiver.get();
-                rt = receiver.type;
-                if (receiver instanceof Tree.VarSel) {
-                    var v1 = (Tree.VarSel) receiver;
-                    if (v1.isClassName) {
-                        // Special case: invoking a static method, like MyClass.foo()
-                        typeCall(expr, false, v1.name, ctx, true);
-                        return;
-                    }
-                }
-                else if (receiver instanceof Tree.NewClass){
-                    var v2 = (Tree.NewClass) receiver;
-                    var clazz = ctx.getClass(v2.clazz.name);
-                    if (clazz.scope.get(expr.method.name) != null)
-                        typeCall(expr, false, v2.clazz.name, ctx, false);
-                    else
-                        issue(new FieldNotFoundError(expr.method.pos, expr.methodName, clazz.type.toString()));
-                    return;
-                }
-                else if (receiver instanceof Tree.This){
-                    var symbol = ctx.lookupBefore(((Tree.VarSel) expr.expr).name, expr.pos).get();
-                    if (symbol instanceof VarSymbol && symbol.type.isFuncType()){
-                        expr.symbol = symbol;
-                        typeCall(expr, (FunType) symbol.type, ctx);
-                        return;
-                    }
-                    else {
-                        //static method
-                        thisClass = true;
-                        expr.setThis();
-                        rt = ctx.currentClass().type;
-                    }
-                }
-            }
-            else{
-                //static method - this class
-                //local var symbol
-                var symbol = ctx.lookupBefore(((Tree.VarSel) expr.expr).name, expr.pos).get();
-                if (symbol instanceof VarSymbol && symbol.type.isFuncType()){
-                    expr.symbol = symbol;
-                    typeCall(expr, (FunType) symbol.type, ctx);
-                    return;
-                }
-                else {
-                    //static method
-                    thisClass = true;
-                    expr.setThis();
-                    rt = ctx.currentClass().type;
-                }
-            }
-        }
-        else if (expr.expr instanceof Tree.Lambda) {
-            var lambda = (Tree.Lambda) (expr.expr);
-            typeCall(expr, (FunType)lambda.type, ctx);
-            return;
-        }
-        else if (expr.expr instanceof Tree.Call){
-            var call = (Tree.Call)expr.expr;
-            typeCall(expr, (FunType) call.type, ctx);
-            return;
-        }
-        else {
-            //static method
-            thisClass = true;
-            expr.setThis();
-            rt = ctx.currentClass().type;
-        }
-        if (rt.isArrayType() &&
-                expr.methodName.equals("length")) { // Special case: array.length()
-            if (!expr.args.isEmpty()) {
-                issue(new BadLengthArgError(expr.pos, expr.args.size()));
-            }
-            expr.isArrayLength = true;
-            expr.type = BuiltInType.INT;
-            return;
-        }
-
-        if (rt.isClassType()) {
-            typeCall(expr, thisClass, ((ClassType) rt).name, ctx, false);
-        }
-            else if (rt.isFuncType()){
-
-            }
-        else{
-            issue(new NotClassFieldError((expr.expr).pos, expr.methodName, rt.toString()));
-        }
+        typeCall(expr, (FunType)expr.expr.type, ctx);
+        return;
     }
 
     private void typeCall(Tree.Call call, FunType type, ScopeStack ctx){
         call.type = type.returnType;
-        // typing args
         var args = call.args;
         for (var arg : args) {
             arg.accept(this, ctx);
@@ -719,7 +617,11 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         if (type.arity() != args.size()) {
             if (call.expr instanceof Tree.Call || call.expr instanceof Tree.Lambda)
                 issue(new BadLambdaArgCountError(call.pos, type.arity(), args.size()));
+            else if (call.expr instanceof Tree.VarSel){
+                issue(new BadArgCountError(call.pos, ((Tree.VarSel)call.expr).name, type.arity(), args.size()));
+            }
             else {
+                System.out.println(call);
                 issue(new BadArgCountError(call.pos, call.symbol.name, type.arity(), args.size()));
             }
         }
@@ -732,46 +634,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
             Type t2 = e.type;
             if (t2.noError() && !t2.subtypeOf(t1)) {
                 issue(new BadArgTypeError(e.pos, i, t2.toString(), t1.toString()));
-            }
-        }
-    }
-    private void typeCall(Tree.Call call, boolean thisClass, String className, ScopeStack ctx, boolean requireStatic) {
-        var clazz = thisClass ? ctx.currentClass() : ctx.getClass(className);
-        var symbol = clazz.scope.lookup(call.methodName);
-        call.type = BuiltInType.ERROR;
-        if (!symbol.isPresent()) {
-            issue(new FieldNotFoundError(call.expr.pos, call.methodName, clazz.type.toString()));
-        }
-        else if (!symbol.get().isMethodSymbol()) {
-            issue(new NotClassMethodError(call.expr.pos, call.methodName, clazz.type.toString()));
-        } else {
-            var method = (MethodSymbol) symbol.get();
-            if (requireStatic && !method.isStatic()) {
-                issue(new NotClassFieldError(call.expr.pos, call.methodName, clazz.type.toString()));
-                return;
-            }
-            call.symbol = method;
-            call.type = method.type.returnType;
-
-            // typing args
-            var args = call.args;
-            for (var arg : args) {
-                arg.accept(this, ctx);
-            }
-
-            // check signature compatibility
-            if (method.type.arity() != args.size()) {
-                issue(new BadArgCountError(call.pos, method.name, method.type.arity(), args.size()));
-            }
-            var iter1 = method.type.argTypes.iterator();
-            var iter2 = call.args.iterator();
-            for (int i = 1; iter1.hasNext() && iter2.hasNext(); i++) {
-                Type t1 = iter1.next();
-                Tree.Expr e = iter2.next();
-                Type t2 = e.type;
-                if (t2.noError() && !t2.subtypeOf(t1)) {
-                    issue(new BadArgTypeError(e.pos, i, t2.toString(), t1.toString()));
-                }
             }
         }
     }
@@ -863,8 +725,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         }
         else{
             lambda.block.accept(this, ctx);
-
-
             if (lambda.block.returnTypes.size() >= 1 && !lambda.block.returns) {
                 var flag = false;
                 for (var t : lambda.block.returnTypes){
@@ -873,7 +733,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                 if (flag)
                     issue(new MissingReturnError(lambda.block.pos));
             }
-
             Tree.Block block = lambda.block;
             if (!block.returnTypes.isEmpty()) {
                 Pos pos = ctx.currentLambda() != null ? ctx.currentLambda().scope.nestedLocalScope().block.pos : ctx.currentMethod().pos;

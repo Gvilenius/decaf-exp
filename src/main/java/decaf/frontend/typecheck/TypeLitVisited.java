@@ -81,7 +81,6 @@ public interface TypeLitVisited extends Visitor<ScopeStack>, ErrorIssuer {
             if (param.type.isVoidType())
                 issue(new ParamVoidError(param.pos));
         }
-
         expr.type = new FunType(expr.returnType.type, argTypes);
     }
 
