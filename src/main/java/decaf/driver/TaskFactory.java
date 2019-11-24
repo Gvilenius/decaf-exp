@@ -1,9 +1,11 @@
 package decaf.driver;
 
 import decaf.frontend.parsing.JaccParser;
+import decaf.frontend.tacgen.TacGen;
 import decaf.frontend.tree.Tree;
 import decaf.frontend.typecheck.Namer;
 import decaf.frontend.typecheck.Typer;
+import decaf.lowlevel.tac.TacProg;
 
 import java.io.InputStream;
 
@@ -24,11 +26,10 @@ public class TaskFactory {
     public Task<InputStream, Tree.TopLevel> typeCheck() {
         return parse().then(new Namer(config)).then(new Typer(config));
     }
-//
-//    public Task<InputStream, TacProg> tacGen() {
-//        return typeCheck().then(new TacGen(config));
-//    }
-//
+    public Task<InputStream, TacProg> tacGen() {
+        return typeCheck().then(new TacGen(config));
+    }
+
 //    public Task<InputStream, TacProg> optimize() {
 //        return tacGen().then(new Optimizer(config));
 //    }

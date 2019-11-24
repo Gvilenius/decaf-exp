@@ -222,20 +222,12 @@ public class ScopeStack {
         ListIterator<Scope> iter = scopeStack.listIterator(scopeStack.size());
         while (iter.hasPrevious()) {
             var scope = iter.previous();
-//            System.out.println(scope);
-//            scope.symbols.keySet().forEach(e ->System.out.println(e));
-            if (!cond.test(scope)) {
-//                System.out.println();
+            if (!cond.test(scope))
                 return Optional.empty();
-            }
             var symbol = scope.find(key);
             if (symbol.isPresent() && validator.test(symbol.get()))
-            {
-//                System.out.println();
                 return symbol;
-            }
         }
-//        System.out.println();
         return cond.test(global) ? global.find(key) : Optional.empty();
     }
 }
