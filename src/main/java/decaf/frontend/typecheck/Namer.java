@@ -265,7 +265,6 @@ public class Namer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         var symbol = new MethodSymbol(method.name, method.type, formal, method.pos, method.modifiers,
                 ctx.currentClass());
 
-
         ctx.declare(symbol);
         method.symbol = symbol;
         ctx.open(formal);

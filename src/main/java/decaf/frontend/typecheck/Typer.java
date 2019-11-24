@@ -609,6 +609,12 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
 
     private void typeCall(Tree.Call call, FunType type, ScopeStack ctx){
         call.type = type.returnType;
+        if (call.expr instanceof Tree.VarSel)
+            call.symbol = ((Tree.VarSel)call.expr).symbol;
+        else if (call.expr instanceof Tree.Lambda)
+            call.symbol = ((Tree.Lambda)call.expr).symbol;
+        else if (call.expr instanceof Tree.Call)
+            call.symbol = ((Tree.Call)call.expr).symbol;
         var args = call.args;
         for (var arg : args) {
             arg.accept(this, ctx);
@@ -621,7 +627,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                 issue(new BadArgCountError(call.pos, ((Tree.VarSel)call.expr).name, type.arity(), args.size()));
             }
             else {
-                System.out.println(call);
                 issue(new BadArgCountError(call.pos, call.symbol.name, type.arity(), args.size()));
             }
         }
