@@ -25,12 +25,8 @@ public class LambdaScope extends Scope {
         return (symbols.containsKey(key));
     }
 
-    public LambdaScope() {
-        super(Kind.LOCAL);
-    }
-
     public LambdaScope(LocalScope parent) {
-        super(Kind.LOCAL);
+        super(Kind.LAMBDA);
         parent.nested.add(this);
     }
 

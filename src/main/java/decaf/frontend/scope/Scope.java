@@ -24,7 +24,7 @@ import java.util.*;
 public abstract class Scope implements Iterable<Symbol> {
 
     public enum Kind {
-        GLOBAL, CLASS, FORMAL, LOCAL
+        GLOBAL, CLASS, FORMAL, LOCAL, LAMBDA
     }
 
     public final Kind kind;

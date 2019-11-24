@@ -678,6 +678,7 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
 
         var initVal = stmt.initVal.get();
         if (initVal instanceof Tree.Lambda){ stk.push(stmt.name);}
+
         localVarDefPos = Optional.ofNullable(stmt.id.pos);
         initVal.accept(this, ctx);
         localVarDefPos = Optional.empty();
