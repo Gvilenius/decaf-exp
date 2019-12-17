@@ -4,7 +4,6 @@ import decaf.backend.asm.AsmEmitter;
 import decaf.backend.asm.SubroutineInfo;
 import decaf.backend.dataflow.CFG;
 import decaf.lowlevel.instr.PseudoInstr;
-
 /**
  * Register allocation.
  */

@@ -25,13 +25,14 @@ public class Namer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
     public Namer(Config config) {
         super("namer", config);
     }
-    public Stack<String> lambdaStack = new Stack<>();
 
+    private List<Tree.Lambda> lambdas = new ArrayList<>();
     @Override
     public Tree.TopLevel transform(Tree.TopLevel tree) {
         tree.globalScope = new GlobalScope();
         var ctx = new ScopeStack(tree.globalScope);
         tree.accept(this, ctx);
+        tree.lambdas.addAll(lambdas);
         return tree;
     }
 
@@ -362,6 +363,7 @@ public class Namer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
 
     @Override
     public void visitLambda(Tree.Lambda lambda, ScopeStack ctx) {
+        lambdas.add(lambda);
         var scope = new LambdaScope((LocalScope)ctx.currentScope());
         var symbol = new LambdaSymbol(null, scope, lambda.pos);
         ctx.declare(symbol);

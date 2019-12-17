@@ -11,7 +11,6 @@ public class TacProg {
      * Virtual tables.
      */
     public final List<VTable> vtables;
-
     /**
      * Functions.
      */

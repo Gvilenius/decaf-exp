@@ -3,6 +3,7 @@ package decaf.frontend.tacgen;
 import decaf.driver.Config;
 import decaf.driver.Phase;
 import decaf.frontend.tree.Tree;
+import decaf.lowlevel.instr.Temp;
 import decaf.lowlevel.tac.*;
 
 import java.io.FileNotFoundException;
@@ -29,6 +30,8 @@ public class TacGen extends Phase<Tree.TopLevel, TacProg> implements TacEmitter 
 
         // Step 1: create virtual tables.
         pw.visitVTables();
+        pw.buildStaticVTable();
+        pw.buildLambdaVTable(tree.lambdas);
 
         // Step 2: emit tac instructions for every method.
         for (var clazz : tree.classes) {
@@ -44,7 +47,6 @@ public class TacGen extends Phase<Tree.TopLevel, TacProg> implements TacEmitter 
                         numArgs++;
                         i++;
                     }
-
                     mv = pw.visitFunc(clazz.name, method.name, numArgs);
                     for (var param : method.params) {
                         param.symbol.temp = mv.getArgTemp(i);
@@ -58,6 +60,28 @@ public class TacGen extends Phase<Tree.TopLevel, TacProg> implements TacEmitter 
             }
         }
 
+        for (var lambda : tree.lambdas){
+
+            FuncVisitor mv;
+            var numArgs = lambda.varList.size() + 1;
+            var i = 1;
+
+            mv = pw.visitFunc("LAMBDA", lambda.pos.toString(), numArgs);
+            mv.lambda = lambda;
+            for (var param : lambda.varList) {
+                param.symbol.temp = mv.getArgTemp(i);
+                i++;
+            }
+
+            if (lambda.block != null)
+                lambda.block.accept(this, mv);
+            else {
+                lambda.expr.accept(this, mv);
+                mv.visitReturn(lambda.expr.val);
+            }
+
+            mv.visitEnd();
+        }
         return pw.visitEnd();
     }
 

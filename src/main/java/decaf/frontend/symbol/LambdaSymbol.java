@@ -9,12 +9,17 @@ import decaf.frontend.tree.Tree;
 import decaf.frontend.type.FunType;
 import decaf.frontend.type.Type;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class LambdaSymbol extends Symbol {
     public final FunType type;
     /**
      * Associated formal scope of the method parameters.
      */
     public final LambdaScope scope;
+    public List<VarSymbol> capture = new ArrayList<>();
+    public boolean captureThis = false;
 
     public LambdaSymbol(FunType type, LambdaScope scope, Pos pos) {
         super(String.format("lambda@%s", pos), type, pos);

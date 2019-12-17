@@ -5,6 +5,7 @@ import decaf.driver.Phase;
 import decaf.driver.error.*;
 import decaf.frontend.scope.LambdaScope;
 import decaf.frontend.scope.LocalScope;
+import decaf.frontend.scope.Scope;
 import decaf.frontend.scope.ScopeStack;
 import decaf.frontend.symbol.*;
 import decaf.frontend.tree.Pos;
@@ -458,6 +459,8 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
             issue(new ThisInStaticFuncError(expr.pos));
         }
         expr.type = ctx.currentClass().type;
+        if (ctx.currentLambda() != null)
+            ctx.currentLambda().captureThis = true;
     }
 
     private boolean allowClassNameVar = false;
@@ -471,10 +474,21 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                 return;
             }
             var symbol = ctx.lookupBefore(expr.name, localVarDefPos.orElse(expr.pos));
+
             if (symbol.isPresent()) {
+                expr.symbol = symbol.get();
                 if (symbol.get().isVarSymbol()) {
                     var var = (VarSymbol) symbol.get();
-                    expr.symbol = var;
+                    //capture
+                    if (ctx.currentLambda() != null){
+                        if (var.isMemberVar()){
+                            ctx.currentLambda().captureThis = true;
+                        }
+                        else if (var.pos.compareTo(ctx.currentLambda().pos)<0&& !ctx.currentLambda().capture.contains(var)) {
+                            ctx.currentLambda().capture.add(var);
+                        }
+                    }
+
                     expr.type = var.type;
                     if (var.isMemberVar()) {
                         if (ctx.currentMethod().isStatic()) {
@@ -485,7 +499,6 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                     }
                     return;
                 }
-
                 if (symbol.get().isClassSymbol() && allowClassNameVar) { // special case: a class name
                     var clazz = (ClassSymbol) symbol.get();
                     expr.type = clazz.type;
@@ -497,6 +510,8 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
                     if (ctx.currentMethod().isStatic() && !method.isStatic())
                         issue(new RefNonStaticError(expr.pos, ctx.currentMethod().name, expr.name));
                     expr.type = method.type;
+                    if (!method.isStatic())
+                        expr.setThis();
                     return;
                 }
             }
@@ -562,6 +577,7 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         else if (field.isPresent() && field.get().isMethodSymbol()){
             var method = (MethodSymbol) field.get();
             expr.type = method.type;
+            expr.symbol = method;
         }
         else if (field.isEmpty()) {
             issue(new FieldNotFoundError(expr.pos, expr.name, ct.toString()));
@@ -597,20 +613,20 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         expr.type = BuiltInType.ERROR;
         expr.expr.accept(this, ctx);
         if (expr.expr.type==null || expr.expr.type.hasError()) return;
-
         if (! (expr.expr.type instanceof FunType)) {
             issue(new NotCallableTypeError(expr.pos, expr.expr.type.toString()));
             return;
         }
-
         typeCall(expr, (FunType)expr.expr.type, ctx);
         return;
     }
 
     private void typeCall(Tree.Call call, FunType type, ScopeStack ctx){
         call.type = type.returnType;
-        if (call.expr instanceof Tree.VarSel)
-            call.symbol = ((Tree.VarSel)call.expr).symbol;
+        if (call.expr instanceof Tree.VarSel) {
+            call.symbol = ((Tree.VarSel) call.expr).symbol;
+            if (((Tree.VarSel) call.expr).name.equals("length")) call.isArrayLength = true;
+        }
         else if (call.expr instanceof Tree.Lambda)
             call.symbol = ((Tree.Lambda)call.expr).symbol;
         else if (call.expr instanceof Tree.Call)
@@ -705,6 +721,7 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
             issue(new BadVarTypeError(stmt.pos, stmt.id.name));
         } else {
             var symbol = new VarSymbol(stmt.symbol.name, initVal.type, stmt.symbol.pos);
+            stmt.symbol = symbol;
             ctx.declare(symbol);
         }
     }
@@ -714,8 +731,12 @@ public class Typer extends Phase<Tree.TopLevel, Tree.TopLevel> implements TypeLi
         var scope = lambda.symbol.scope;
         typeLambda(lambda, ctx, scope);
         var symbol = new LambdaSymbol((FunType) lambda.type, lambda.symbol.scope, lambda.symbol.pos);
+        symbol.capture = lambda.symbol.capture;
+        symbol.captureThis = lambda.symbol.captureThis;
         ctx.declare(symbol);
         lambda.symbol = symbol;
+
+        lambda.putOffset();
     }
     private void typeLambda(Tree.Lambda lambda, ScopeStack ctx, LambdaScope lambdaScope){
         ctx.open(lambdaScope);

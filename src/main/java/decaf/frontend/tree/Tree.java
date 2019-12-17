@@ -30,6 +30,7 @@ public abstract class Tree {
     public static class TopLevel extends TreeNode {
         // Tree elements
         public List<ClassDef> classes;
+        public List<Lambda> lambdas = new ArrayList<>();
         // For type check
         public GlobalScope globalScope;
         public ClassSymbol mainClass;
@@ -989,8 +990,17 @@ public abstract class Tree {
         public List<LocalVarDef> varList;
         public Expr expr;
         public Block block;
-
         public LambdaSymbol symbol;
+        public Map<VarSymbol, Integer> offsets = new TreeMap();
+        public void putOffset(){
+            int base = symbol.captureThis ? 16 : 12;
+            for (int i = 0; i < symbol.capture.size(); i++) {
+                offsets.put(symbol.capture.get(i), base + i*4);
+            }
+        }
+        public int getOffset(VarSymbol var){
+            return offsets.get(var);
+        }
         public Lambda(List<LocalVarDef> varList, Expr expr, Pos pos){
             super(Kind.LAMBDA, "Lambda", pos);
             this.varList = varList;
@@ -1166,7 +1176,7 @@ public abstract class Tree {
         // For convenience
         public String name;
         // For type check
-        public VarSymbol symbol;
+        public Symbol symbol;
         public boolean isClassName = false;
 
         public VarSel(Optional<Expr> receiver, Id variable, Pos pos) {
@@ -1613,41 +1623,15 @@ public abstract class Tree {
     public static class Call extends Expr {
         // Tree elements
         public Expr expr;
-        public Optional<Expr> receiver;
-        public Id method;
         public List<Expr> args;
         //
-        public String methodName;
         // For type check
         public Symbol symbol;
         public boolean isArrayLength = false;
-
-        public Call(Optional<Expr> receiver, Id method, List<Expr> args, Pos pos) {
-            super(Kind.CALL, "Call", pos);
-            this.receiver = receiver;
-            this.method = method;
-            this.args = args;
-            this.methodName = method.name;
-        }
         public Call(Expr expr, List<Expr> args, Pos pos){
             super(Kind.CALL, "Call", pos);
             this.expr = expr;
-            if (expr instanceof VarSel){
-                this.receiver = ((VarSel)expr).receiver;
-                this.method = ((VarSel)expr).variable;
-                this.methodName = ((VarSel)expr).variable.name;
-            }
-            else{
-                this.receiver = Optional.empty();
-            }
             this.args = args;
-        }
-        public Call(Id method, List<Expr> args, Pos pos) {
-            this(Optional.empty(), method, args, pos);
-        }
-
-        public Call(Expr receiver, Id method, List<Expr> args, Pos pos) {
-            this(Optional.of(receiver), method, args, pos);
         }
 
         /**
@@ -1656,32 +1640,22 @@ public abstract class Tree {
          * Reversed for type check.
          */
         public void setThis() {
-            this.receiver = Optional.of(new This(pos));
+            ((VarSel)expr).receiver = Optional.of(new This(pos));
         }
 
         @Override
         public Object treeElementAt(int index) {
-            if (method != null)
-                return switch (index) {
-                    case 0 -> receiver;
-                    case 1 -> method;
-                    case 2 -> args;
-                    default -> throw new IndexOutOfBoundsException(index);
-                };
-            else
-                return switch (index) {
-                    case 0 -> expr;
-                    case 1 -> args;
-                    default -> throw new IndexOutOfBoundsException(index);
-                };
+            return switch (index) {
+                case 0 -> expr;
+                case 1 -> args;
+                default -> throw new IndexOutOfBoundsException(index);
+            };
         }
 
         @Override
         public int treeArity()
         {
-            if (method != null)
-                return 3;
-            else return 2;
+            return 2;
         }
 
         @Override

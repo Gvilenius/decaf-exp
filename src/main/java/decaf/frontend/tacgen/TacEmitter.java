@@ -1,6 +1,8 @@
 package decaf.frontend.tacgen;
 
+import decaf.frontend.symbol.LambdaSymbol;
 import decaf.frontend.symbol.MethodSymbol;
+import decaf.frontend.symbol.VarSymbol;
 import decaf.frontend.tree.Tree;
 import decaf.frontend.tree.Visitor;
 import decaf.frontend.type.BuiltInType;
@@ -34,7 +36,6 @@ public interface TacEmitter extends Visitor<FuncVisitor> {
      * Push a label when entering a loop, and pop when leaving a loop.
      */
     Stack<Label> loopExits = new Stack<>();
-
     @Override
     default void visitBlock(Tree.Block block, FuncVisitor mv) {
         for (var stmt : block.stmts) {
@@ -47,7 +48,6 @@ public interface TacEmitter extends Visitor<FuncVisitor> {
         def.symbol.temp = mv.freshTemp();
         if (def.initVal.isEmpty()) return;
         var initVal = def.initVal.get();
-
         initVal.accept(this, mv);
         mv.visitAssign(def.symbol.temp, initVal.val);
     }
@@ -63,14 +63,16 @@ public interface TacEmitter extends Visitor<FuncVisitor> {
             mv.visitStoreTo(addr, assign.rhs.val);
         } else if (assign.lhs instanceof Tree.VarSel) {
             var v = (Tree.VarSel) assign.lhs;
-            if (v.symbol.isMemberVar()) {
+            //assert
+            var varSymbol = (VarSymbol) v.symbol;
+            if (varSymbol.isMemberVar()) {
                 var object = v.receiver.get();
                 object.accept(this, mv);
                 assign.rhs.accept(this, mv);
-                mv.visitMemberWrite(object.val, v.symbol.getOwner().name, v.name, assign.rhs.val);
+                mv.visitMemberWrite(object.val, varSymbol.getOwner().name, v.name, assign.rhs.val);
             } else { // local or param
                 assign.rhs.accept(this, mv);
-                mv.visitAssign(v.symbol.temp, assign.rhs.val);
+                mv.visitAssign(varSymbol.temp, assign.rhs.val);
             }
         }
     }
@@ -235,24 +237,39 @@ public interface TacEmitter extends Visitor<FuncVisitor> {
         };
         expr.lhs.accept(this, mv);
         expr.rhs.accept(this, mv);
-        if (op.equals(TacInstr.Binary.Op.MOD) || op.equals(TacInstr.Binary.Op.DIV)){
-            var exit = mv.freshLabel();
-            mv.visitBranch(TacInstr.CondBranch.Op.BNEZ, expr.rhs.val, exit);
-            mv.visitPrint(RuntimeError.DIVIDE_ZERO_ERROR);
-            mv.visitLabel(exit);
-            mv.visitIntrinsicCall(Intrinsic.HALT);
-        }
-        expr.val = mv.visitBinary(op, expr.lhs.val, expr.rhs.val);
+        expr.val = emitDivideOrModZero(op, expr, mv);
     }
 
     @Override
     default void visitVarSel(Tree.VarSel expr, FuncVisitor mv) {
-        if (expr.symbol.isMemberVar()) {
-            var object = expr.receiver.get();
-            object.accept(this, mv);
-            expr.val = mv.visitMemberAccess(object.val, expr.symbol.getOwner().name, expr.name);
-        } else { // local or param
-            expr.val = expr.symbol.temp;
+        if (expr.symbol.isVarSymbol()) {
+            var varSymbol = (VarSymbol) expr.symbol;
+
+            if (mv.lambda != null && mv.lambda.symbol.capture.contains(varSymbol)){
+                var offset = mv.lambda.getOffset(varSymbol);
+                expr.val = mv.visitLoadFrom(mv.getArgTemp(0), offset);
+            }
+            else if (varSymbol.isMemberVar()) {
+                var object = expr.receiver.get();
+                object.accept(this, mv);
+                expr.val = mv.visitMemberAccess(object.val, varSymbol.getOwner().name, expr.name);
+            } else { // local or param
+                expr.val = varSymbol.temp;
+            }
+        }
+        else if (expr.symbol.isMethodSymbol()){
+            var methodSymbol = (MethodSymbol) expr.symbol;
+            if (expr.receiver.isPresent()) {
+                var object = expr.receiver.get();
+                object.accept(this, mv);
+                if (methodSymbol.isStatic())
+                    expr.val = mv.visitMethodAccess(methodSymbol.owner.name, expr.name);
+                else
+                    expr.val = mv.visitMethodAccess(object.val, methodSymbol.owner.name, expr.name);
+            }
+            else{
+                expr.val = mv.visitMethodAccess(methodSymbol.owner.name, expr.name);
+            }
         }
     }
 
@@ -277,43 +294,52 @@ public interface TacEmitter extends Visitor<FuncVisitor> {
 
     @Override
     default void visitThis(Tree.This expr, FuncVisitor mv) {
-        expr.val = mv.getArgTemp(0);
+        if (mv.lambda != null && mv.lambda.symbol.captureThis){
+            expr.val = mv.visitLoadFrom(mv.getArgTemp(0), 12);
+        }
+        else
+            expr.val = mv.getArgTemp(0);
     }
 
     @Override
+    default void visitLambda(Tree.Lambda lambda, FuncVisitor mv){
+        lambda.val = mv.visitLambda(lambda, lambda.pos.toString(), lambda.symbol.capture, lambda.symbol.captureThis);
+    }
+    @Override
     default void visitCall(Tree.Call expr, FuncVisitor mv) {
         if (expr.isArrayLength) { // special case for array.length()
-            var array = expr.receiver.get();
+            var array = ((Tree.VarSel)expr.expr).receiver.get();
             array.accept(this, mv);
             expr.val = mv.visitLoadFrom(array.val, -4);
             return;
         }
-
         expr.args.forEach(arg -> arg.accept(this, mv));
         var temps = new ArrayList<Temp>();
         expr.args.forEach(arg -> temps.add(arg.val));
-
-        if (expr.symbol.isMethodSymbol() && ((MethodSymbol) expr.symbol).isStatic()){
-            var method = (MethodSymbol) expr.symbol;
-            if (method.type.returnType.isVoidType()) {
-                mv.visitStaticCall(method.owner.name, expr.symbol.name, temps);
-            } else {
-                expr.val = mv.visitStaticCall(method.owner.name, expr.symbol.name, temps, true);
-            }
-        }
-        else if (expr.symbol.isLambdaSymbol()){
-
-        }
-        else if (expr.symbol.isVarSymbol()){
-
+        //v
+        if (!expr.symbol.isMethodSymbol() || expr.expr instanceof Tree.Call){
+            expr.expr.accept(this, mv);
+            var base = expr.expr.val;
+            if (((FunType)expr.expr.type).returnType.isVoidType())
+                mv.visitVarCall(base, temps,false);
+            else
+                expr.val = mv.visitVarCall(base, temps,true);
         }
         else {
-            var object = expr.receiver.get();
-            object.accept(this, mv);
-            if (((FunType)expr.symbol.type).returnType.isVoidType()) {
-                mv.visitMemberCall(object.val, ((MethodSymbol)expr.symbol).owner.name, expr.symbol.name, temps);
+            var method = (MethodSymbol) expr.symbol;
+            if (method.isStatic()) {
+                if (method.type.returnType.isVoidType())
+                    mv.visitStaticCall(method.owner.name, expr.symbol.name, temps);
+                else
+                    expr.val = mv.visitStaticCall(method.owner.name, expr.symbol.name, temps, true);
             } else {
-                expr.val = mv.visitMemberCall(object.val, ((MethodSymbol)expr.symbol).owner.name, expr.symbol.name, temps, true);
+                var object = ((Tree.VarSel)expr.expr).receiver.get();
+                object.accept(this, mv);
+                if (((FunType) expr.symbol.type).returnType.isVoidType()) {
+                    mv.visitMemberCall(object.val, method.owner.name, expr.symbol.name, temps);
+                } else {
+                    expr.val = mv.visitMemberCall(object.val, method.owner.name, expr.symbol.name, temps, true);
+                }
             }
         }
     }
@@ -576,6 +602,20 @@ public interface TacEmitter extends Visitor<FuncVisitor> {
         var four = mv.visitLoad(4);
         var offset = mv.visitBinary(TacInstr.Binary.Op.MUL, index, four);
         return mv.visitBinary(TacInstr.Binary.Op.ADD, array, offset);
+    }
+    private Temp emitDivideOrModZero(TacInstr.Binary.Op op, Tree.Binary expr, FuncVisitor mv){
+        var zero = mv.visitLoad(0);
+        var error = mv.visitBinary(TacInstr.Binary.Op.EQU, expr.rhs.val, zero);
+        var handler = new Consumer<FuncVisitor>() {
+            @Override
+            public void accept(FuncVisitor v) {
+                v.visitPrint(RuntimeError.DIVIDE_OR_MOD_ZERO_ERROR);
+                v.visitIntrinsicCall(Intrinsic.HALT);
+            }
+        };
+        if (op.equals(TacInstr.Binary.Op.DIV) || op.equals(TacInstr.Binary.Op.MOD))
+            emitIfThen(error, handler, mv);
+        return mv.visitBinary(op, expr.lhs.val, expr.rhs.val);
     }
 
     /**

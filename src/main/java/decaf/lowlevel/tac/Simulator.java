@@ -36,6 +36,7 @@ public final class Simulator {
         _memory = new Memory();
         _string_pool = new StringPool();
         _vtable_to_addr = new TreeMap<>();
+
         _instrs = new Vector<>();
         _label_to_addr = new TreeMap<>();
         _addr_to_function = new TreeMap<>();
@@ -115,7 +116,6 @@ public final class Simulator {
             if (_halt) {
                 return;
             }
-
             _instrs.get(_pc).accept(executor);
             count++;
         }
@@ -141,7 +141,6 @@ public final class Simulator {
      * Look up a vtable's address in memory by its name.
      */
     private Map<String, Integer> _vtable_to_addr;
-
     /**
      * Simulate instruction memory. The "address" is simply the index of this vector.
      */

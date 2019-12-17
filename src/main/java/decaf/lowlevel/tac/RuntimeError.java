@@ -14,7 +14,7 @@ public final class RuntimeError {
 
     public static final String CLASS_CAST_ERROR1 = "Decaf runtime error: ";
 
-    public static final String DIVIDE_ZERO_ERROR = "Decaf runtime error: Division by zero error\n";
+    public static final String DIVIDE_OR_MOD_ZERO_ERROR = "Decaf runtime error: Division by zero error\n";
 
     public static final String CLASS_CAST_ERROR2 = " cannot be cast to ";
 

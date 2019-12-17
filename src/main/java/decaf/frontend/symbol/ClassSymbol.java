@@ -90,7 +90,6 @@ public final class ClassSymbol extends Symbol {
         var memberVariables = new TreeSet<String>();
         var memberMethods = new TreeSet<String>();
         var staticMethods = new TreeSet<String>();
-
         for (var symbol : scope) {
             if (symbol.isVarSymbol()) {
                 memberVariables.add(symbol.name);

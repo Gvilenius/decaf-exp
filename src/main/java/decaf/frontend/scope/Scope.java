@@ -1,6 +1,7 @@
 package decaf.frontend.scope;
 
 import decaf.frontend.symbol.Symbol;
+import decaf.frontend.tree.Pos;
 
 import java.util.*;
 

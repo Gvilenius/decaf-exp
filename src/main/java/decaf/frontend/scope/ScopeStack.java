@@ -122,9 +122,18 @@ public class ScopeStack {
             assert lambdaStack.empty();
         }
         else if (scope.isLambdaScope()){
-            lambdaStack.pop();
+            var old = lambdaStack.pop().getOwner();
             if (!lambdaStack.isEmpty()){
                 currLambda = lambdaStack.peek().getOwner();
+                old.capture.forEach(e->{
+                    if (!currLambda.capture.contains(e)) {
+                        if (e.pos.compareTo(currLambda.pos) < 0) {
+                            currLambda.capture.add(e);
+                        }
+                    }
+                });
+                if (old.captureThis)
+                    currLambda.captureThis = true;
             }
             else
                 currLambda = null;
@@ -229,5 +238,19 @@ public class ScopeStack {
                 return symbol;
         }
         return cond.test(global) ? global.find(key) : Optional.empty();
+    }
+
+    public boolean isCapture(String name, Pos pos){
+        Scope scope = currentScope();
+        //lambda里不会有formal
+        //lambda嵌套的情况在ctx的close中处理
+        while (scope.isLocalScope()){
+            if (scope.containsKey(name) && scope.get(name).pos.compareTo(pos) < 0)
+                break;
+            scope = ((LocalScope) scope).getParent();
+        }
+        if (scope.isLambdaScope() && !scope.containsKey(name))
+            return true;
+        return false;
     }
 }

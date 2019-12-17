@@ -12,7 +12,6 @@ public class LocalScope extends Scope {
 
     public LocalScope(Scope parent) {
         super(Kind.LOCAL);
-//        assert parent.isFormalOrLocalScope();
         if (parent.isFormalScope()) {
             ((FormalScope) parent).setNested(this);
             this.parent = parent;
@@ -52,7 +51,9 @@ public class LocalScope extends Scope {
     public List<Scope> nestedLocalScopes() {
         return nested;
     }
-
+    public Scope getParent(){
+        return parent;
+    }
     private Scope parent;
     public List<Scope> nested = new ArrayList<>();
     public Tree.Block block;

@@ -5,6 +5,7 @@ import decaf.frontend.scope.FormalScope;
 import decaf.frontend.tree.Pos;
 import decaf.frontend.tree.Tree;
 import decaf.frontend.type.FunType;
+import decaf.lowlevel.instr.Temp;
 
 /**
  * Method symbol, representing a method definition.
@@ -72,4 +73,5 @@ public final class MethodSymbol extends Symbol {
         return modifiers.isAbstract();
     }
     private boolean main = false;
+    public Temp temp;
 }

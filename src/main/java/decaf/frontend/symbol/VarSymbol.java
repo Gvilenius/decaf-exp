@@ -43,7 +43,7 @@ public final class VarSymbol extends Symbol {
     }
 
     public boolean isParam() {
-        return definedIn.isLambdaScope() || definedIn.isFormalScope();
+        return definedIn!=null && (definedIn.isLambdaScope() || definedIn.isFormalScope());
     }
 
     public boolean isMemberVar() {
@@ -67,5 +67,4 @@ public final class VarSymbol extends Symbol {
      * Temp, reserved for {@link decaf.frontend.tacgen.TacGen}.
      */
     public Temp temp;
-    public LambdaSymbol lambdaSymbol;
 }

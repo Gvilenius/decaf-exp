@@ -46,6 +46,7 @@ public class VTable {
      * Labels of all member methods.
      */
     List<FuncLabel> memberMethods = new ArrayList<>();
+    List<FuncLabel> staticMethods = new ArrayList<>();
 
     List<String> memberVariables = new ArrayList<>();
 

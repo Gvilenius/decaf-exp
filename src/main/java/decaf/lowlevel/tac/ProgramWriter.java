@@ -1,5 +1,6 @@
 package decaf.lowlevel.tac;
 
+import decaf.frontend.tree.Tree;
 import decaf.lowlevel.label.FuncLabel;
 import decaf.lowlevel.label.Label;
 
@@ -70,7 +71,7 @@ public class ProgramWriter {
      * @return TAC program
      */
     public TacProg visitEnd() {
-        return new TacProg(ctx.getVTables(), ctx.funcs);
+        return new TacProg(ctx.getVTables(),  ctx.funcs);
     }
 
     private HashMap<String, ClassInfo> classes = new HashMap<>();
@@ -90,23 +91,49 @@ public class ProgramWriter {
         var mv = new FuncVisitor(entry, 0, ctx);
 
         var vtbl = ctx.getVTable(clazz);
+
         var size = mv.visitLoad(vtbl.getObjectSize());
+
         var object = mv.visitIntrinsicCall(Intrinsic.ALLOCATE, true, size);
         var addr = mv.visitLoadVTable(clazz);
         mv.visitStoreTo(object, addr); // the first 4 bytes: address of its virtual table
+
         mv.visitReturn(object);
         mv.visitEnd();
     }
 
+    public void buildStaticVTable(){
+        ctx.putConstructorLabel("STATIC");
+        var vtbl = new VTable("STATIC", Optional.empty());
+        for (var clazz: classes.values()){
+            for (var method : clazz.staticMethods) {
+                if (!method.equals("main"))
+                    vtbl.memberMethods.add(ctx.getFuncLabel(clazz.name, method));
+            }
+        }
+        ctx.putVTable(vtbl);
+        ctx.putStaticOffsets(vtbl);
+
+        createConstructorFor("STATIC");
+    }
+    public void buildLambdaVTable(List<Tree.Lambda> lambdas){
+        ctx.putConstructorLabel("LAMBDA");
+        var vtbl = new VTable("LAMBDA", Optional.empty());
+        for (var lambda: lambdas){
+            ctx.putFuncLabel("LAMBDA", lambda.pos.toString());
+            vtbl.memberMethods.add(ctx.getFuncLabel("LAMBDA", lambda.pos.toString()));
+        }
+        ctx.putVTable(vtbl);
+        ctx.putLambdaOffsets(vtbl);
+        createConstructorFor("LAMBDA");
+    }
     private void buildVTableFor(ClassInfo clazz) {
         if (ctx.hasVTable(clazz.name)) return;
-
         var parent = clazz.parent.map(c -> {
             buildVTableFor(classes.get(c));
             return ctx.getVTable(c);
         });
         var vtbl = new VTable(clazz.name, parent);
-
         // Member methods consist of ones that are:
         // 1. inherited from super class
         // 2. overriden by this class
@@ -144,6 +171,7 @@ public class ProgramWriter {
 
         ctx.putVTable(vtbl);
         ctx.putOffsets(vtbl);
+
     }
 
     class Context {
@@ -182,12 +210,20 @@ public class ProgramWriter {
             vtables.put(vtbl.className, vtbl);
         }
 
+
         List<VTable> getVTables() {
             return new ArrayList<>(vtables.values());
         }
 
         int getOffset(String clazz, String member) {
             return offsets.get(clazz + "." + member);
+        }
+
+        int getStaticOffset(String clazz, String member) {
+            return offsets.get("static " + clazz + "." + member);
+        }
+        int getLambdaOffset(String pos) {
+            return offsets.get("LAMBDA" + pos);
         }
 
         void putOffsets(VTable vtbl) {
@@ -205,11 +241,23 @@ public class ProgramWriter {
                 offset += 4;
             }
         }
+        void putStaticOffsets(VTable vtbl) {
+            var offset = 8;
+            for (var l : vtbl.memberMethods) {
+                offsets.put("static " + l.clazz + "." + l.method, offset);
+                offset += 4;
+            }
+        }
+        void putLambdaOffsets(VTable vtbl) {
+            var offset = 8;
+            for (var l : vtbl.memberMethods) {
+                offsets.put("LAMBDA" + l.method, offset);
+                offset += 4;
+            }
+        }
 
         private Map<String, FuncLabel> labels = new TreeMap<>();
-
         private Map<String, VTable> vtables = new TreeMap<>();
-
         private Map<String, Integer> offsets = new TreeMap<>();
 
         List<TacFunc> funcs = new ArrayList<>();

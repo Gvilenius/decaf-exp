@@ -1,15 +1,66 @@
 package decaf.lowlevel.tac;
 
+import decaf.frontend.symbol.VarSymbol;
+import decaf.frontend.tree.Tree;
 import decaf.lowlevel.instr.Temp;
 import decaf.lowlevel.label.FuncLabel;
 import decaf.lowlevel.label.Label;
 
 import java.util.List;
+import java.util.function.Function;
 
+//
+//                            _ooOoo_
+//                           o8888888o
+//                           88" . "88
+//                           (| -_- |)
+//                           O\  =  /O
+//                        ____/`---'\____
+//                      .'  \\|     |//  `.
+//                     /  \\|||  :  |||//  \
+//                    /  _||||| -:- |||||-  \
+//                    |   | \\\  -  /// |   |
+//                    | \_|  ''\---/''  |   |
+//                    \  .-\__  `-`  ___/-. /
+//                  ___`. .'  /--.--\  `. . __
+//               ."" '<  `.___\_<|>_/___.'  >'"".
+//              | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+//              \  \ `-.   \_ __\ /__ _/   .-` /  /
+//         ======`-.____`-.___\_____/___.-`____.-'======
+//                            `=---='
+//        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//                      佛祖保佑       永无BUG
 /**
  * Append instructions to a TAC function.
  */
 public class FuncVisitor {
+    public Temp visitLambda(Tree.Lambda expr, String pos, List<VarSymbol> captureVars, boolean captureThis){
+        int numCaptures = captureVars.size();
+        if (captureThis) ++numCaptures;
+        Temp size = visitLoad((3 + numCaptures) * 4);
+        Temp temp = visitIntrinsicCall(Intrinsic.ALLOCATE, true, size);
+        visitStoreTo(temp, visitLoad(2));
+        var vtbl = visitLoadVTable("LAMBDA");
+        var enrty = visitLoadFrom(vtbl, ctx.getLambdaOffset(pos));
+        visitStoreTo(temp, 4, enrty);
+        visitStoreTo(temp, 8, visitLoad(numCaptures));
+        if (captureThis) {
+            if (lambda != null)
+                visitStoreTo(temp, 12, visitLoadFrom(getArgTemp(0), 12));
+            else
+                visitStoreTo(temp, 12, getArgTemp(0));
+        }
+        int base = captureThis ? 16 : 12;
+        for (int i = 0; i < captureVars.size(); i++) {
+            if (lambda != null && lambda.symbol.capture.contains(captureVars.get(i))) {
+                visitStoreTo(temp, base + 4 * i, visitLoadFrom(getArgTemp(0), expr.getOffset(captureVars.get(i))));
+            }
+            else
+                visitStoreTo(temp, base + 4 * i, captureVars.get(i).temp);
+        }
+        return temp;
+    }
+
     /**
      * Append {@link TacInstr.Assign}.
      *
@@ -177,6 +228,7 @@ public class FuncVisitor {
         return visitLoadFrom(object, ctx.getOffset(clazz, variable));
     }
 
+
     /**
      * Append an instruction to write a member variable.
      *
@@ -223,6 +275,70 @@ public class FuncVisitor {
         visitMemberCall(object, clazz, method, args, false);
     }
 
+
+    public Temp visitVarCall(Temp base, List<Temp> args, boolean needReturn){
+        Temp temp = null;
+        var flag = visitLoadFrom(base);
+        var entry = visitLoadFrom(base,4);
+
+//        var cnt = visitLoad(0);
+        var one = visitLoad(1);
+        var two = visitLoad(2);
+//        var four = visitLoad(4);
+        var isOne = visitBinary(TacInstr.Binary.Op.EQU, flag, one);
+        var isTwo = visitBinary(TacInstr.Binary.Op.EQU, flag, two);
+        var skip1 = freshLabel();
+        var skip2 = freshLabel();
+//        var loop = freshLabel();
+        visitBranch(TacInstr.CondBranch.Op.BEQZ, isOne, skip1);
+        func.add(new TacInstr.Parm(visitLoadFrom(base, 8)));
+        visitLabel(skip1);
+        visitBranch(TacInstr.CondBranch.Op.BEQZ, isTwo, skip2);
+//        var capNum = visitLoadFrom(base,8);
+//        Temp addr = visitBinary(TacInstr.Binary.Op.ADD, base, visitLoad(8));
+//        Temp cond;
+        func.add(new TacInstr.Parm(base));
+//        visitLabel(loop);
+//        cond = visitBinary(TacInstr.Binary.Op.LES, cnt, capNum);
+//        visitBranch(TacInstr.CondBranch.Op.BEQZ, cond, skip2);
+//        visitBinarySelf(TacInstr.Binary.Op.ADD, cnt, one);
+//        visitBinarySelf(TacInstr.Binary.Op.ADD, addr, four);
+//        func.add(new TacInstr.Parm(visitLoadFrom(addr)));
+//        visitBranch(loop);
+
+        visitLabel(skip2);
+        for (var arg : args)
+            func.add(new TacInstr.Parm(arg));
+
+        if (needReturn) {
+            temp = freshTemp();
+            func.add(new TacInstr.IndirectCall(temp, entry));
+        } else
+            func.add(new TacInstr.IndirectCall(entry));
+
+        return temp;
+    }
+
+    public Temp visitMethodAccess(String clazz, String method){
+        Temp size = visitLoad(8);
+        Temp temp = visitIntrinsicCall(Intrinsic.ALLOCATE, true, size);
+        var vtbl = visitLoadVTable("STATIC");
+        var entry = visitLoadFrom(vtbl, ctx.getStaticOffset(clazz, method));
+        visitStoreTo(temp, visitLoad(0));
+        visitStoreTo(temp, 4, entry);
+        return temp;
+    }
+    public Temp visitMethodAccess(Temp object, String clazz, String method){
+        Temp size = visitLoad(12);
+        Temp temp = visitIntrinsicCall(Intrinsic.ALLOCATE, true, size);
+        var vtbl = visitLoadFrom(object);
+        var entry = visitLoadFrom(vtbl, ctx.getOffset(clazz, method));
+
+        visitStoreTo(temp, visitLoad(1));
+        visitStoreTo(temp, 8, object);
+        visitStoreTo(temp, 4, entry);
+        return temp;
+    }
     /**
      * Append instructions to invoke a static method.
      *
@@ -422,6 +538,13 @@ public class FuncVisitor {
             argsTemps[i] = freshTemp();
         }
     }
+
+    public FuncVisitor visitFunc(String className, String funcName, int numArgs) {
+        var entry = ctx.getFuncLabel(className, funcName);
+        return new FuncVisitor(entry, numArgs, ctx);
+    }
+    //当前lambda函数
+    public Tree.Lambda lambda;
 
     private TacFunc func;
 
