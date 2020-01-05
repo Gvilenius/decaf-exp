@@ -1,0 +1,19 @@
+class Fibonacci {
+    static int get(int index) {
+        if (index < 2) {
+            int x = 1;
+            int y = x+2;
+            int z = x*y;
+            return 1;
+        }
+        return get(index - 1) + get(index - 2);
+    }
+}
+class Main {
+    static void main() {
+        int b = 1;
+        int x = Fibonacci.get(3);
+        Print(x);
+    }
+}
+
