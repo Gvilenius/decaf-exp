@@ -7,7 +7,6 @@ import decaf.lowlevel.label.FuncLabel;
 import decaf.lowlevel.label.Label;
 
 import java.util.List;
-import java.util.function.Function;
 
 //
 //                            _ooOoo_

@@ -31,6 +31,13 @@ public class TacFunc implements Comparable<TacFunc> {
     void add(TacInstr instr) {
         instrSeq.add(instr);
     }
+    public void replace(TacInstr oldI, TacInstr newI){
+        instrSeq.add(instrSeq.indexOf(oldI), newI);
+        instrSeq.remove(oldI);
+    }
+    public void remove(TacInstr instr){
+        instrSeq.remove(instr);
+    }
 
     public void printTo(PrintWriter pw) {
         for (var instr : instrSeq) {

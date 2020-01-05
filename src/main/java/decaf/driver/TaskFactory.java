@@ -1,5 +1,6 @@
 package decaf.driver;
 
+import decaf.backend.opt.Optimizer;
 import decaf.frontend.parsing.JaccParser;
 import decaf.frontend.tacgen.TacGen;
 import decaf.frontend.tree.Tree;
@@ -30,9 +31,9 @@ public class TaskFactory {
         return typeCheck().then(new TacGen(config));
     }
 
-//    public Task<InputStream, TacProg> optimize() {
-//        return tacGen().then(new Optimizer(config));
-//    }
+    public Task<InputStream, TacProg> optimize() {
+        return tacGen().then(new Optimizer(config));
+    }
 //
 //    public Task<InputStream, String> mips() {
 //        var emitter = new MipsAsmEmitter();

@@ -26,6 +26,7 @@ public class Launcher {
             case PA1 -> tasks.parse();
             case PA2 -> tasks.typeCheck();
             case PA3 -> tasks.tacGen();
+            case PA4 -> tasks.optimize();
             default -> throw new IllegalArgumentException("target not implemented");
         };
         task.apply(config.source);
