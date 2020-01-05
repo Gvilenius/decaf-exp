@@ -25,7 +25,6 @@ def eq(expected: str, actual: str) -> bool:
     with open(actual, 'r') as f:
         actual_lines = [line.rstrip()
                         for line in f.readlines() if line.rstrip() != '']
-        print(actual_lines)
         if actual_lines[0].startswith('Loaded:'): # ignore spim first line
             actual_lines = actual_lines[1:]
 
